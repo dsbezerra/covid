@@ -1,0 +1,1 @@
+Project used to practice OpenGL/Win32 applications.
