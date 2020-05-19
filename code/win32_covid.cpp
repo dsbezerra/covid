@@ -436,12 +436,6 @@ WinMain(HINSTANCE instance,
                         }
                     };
                 }
-                // Begin rendering
-                if (application.task_processed) {
-                    
-                } else {
-                    
-                }
                 
                 LARGE_INTEGER work_counter = win32_get_wallclock();
                 real32 work_seconds_elapsed = win32_get_seconds_elapsed(last_counter, work_counter);

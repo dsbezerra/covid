@@ -45,7 +45,6 @@ struct app {
     int current_state;
     real32 current_time;
     bool running;
-    bool task_processed;
     card cards[4];
 };
 
