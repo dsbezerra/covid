@@ -25,6 +25,7 @@ init_app() {
     result.height = APP_HEIGHT;
     result.current_state = State_NoData;
     result.running = true;
+    result.show_debug_info = true;
     return result;
 }
 
@@ -38,15 +39,6 @@ char *
 app_get_state_description(app *application) {
     assert(application);
     return STATE_DESCRIPTIONS[application->current_state];
-}
-
-bool
-app_resize(app *application, int width, int height) {
-    int old_width = application->width;
-    int old_height = application->height;
-    application->width = width;
-    application->height = height;
-    return old_width != width || old_height != height;
 }
 
 void

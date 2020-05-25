@@ -45,9 +45,15 @@ win32_get_seconds_elapsed(LARGE_INTEGER start, LARGE_INTEGER end)
 
 static void
 winhttp_close() {
-    WinHttpCloseHandle(http_state.request);
-    WinHttpCloseHandle(http_state.session);
-    WinHttpCloseHandle(http_state.connect);
+    if (WinHttpCloseHandle(http_state.request)) {
+        http_state.request = 0;
+    }
+    if (WinHttpCloseHandle(http_state.session)) {
+        http_state.session = 0;
+    }
+    if (WinHttpCloseHandle(http_state.connect)) {
+        http_state.connect = 0;
+    }
 }
 
 static void
@@ -101,6 +107,7 @@ winhttp_status_callback(HINTERNET internet,
                 parse_page(&application, page);
                 delete page;
                 
+                winhttp_close();
             }
             
         } break;
@@ -164,7 +171,43 @@ winhttp_async_get(char *url) {
 }
 
 static void
+win32_opengl_get_functions() {
+    assert(open_gl);
+    opengl_get_function(glGetShaderInfoLog);
+    opengl_get_function(glGetShaderiv);
+    opengl_get_function(glGetProgramiv);
+    opengl_get_function(glGetProgramInfoLog);
+    opengl_get_function(glShaderSource);
+    opengl_get_function(glCreateShader);
+    opengl_get_function(glCompileShader);
+    opengl_get_function(glDetachShader);
+    opengl_get_function(glDeleteShader);
+    opengl_get_function(glCreateProgram);
+    opengl_get_function(glAttachShader);
+    opengl_get_function(glLinkProgram);
+    opengl_get_function(glUseProgram);
+    opengl_get_function(glGenBuffers);
+    opengl_get_function(glBindVertexArray);
+    opengl_get_function(glBindBuffer);
+    opengl_get_function(glBufferData);
+    opengl_get_function(glBufferSubData);
+    opengl_get_function(glVertexAttribPointer);
+    opengl_get_function(glGenVertexArrays);
+    opengl_get_function(glDrawArrays);
+    opengl_get_function(glGetUniformLocation);
+    opengl_get_function(glUniform4f);
+    opengl_get_function(glUniformMatrix4fv);
+    opengl_get_function(glEnableVertexAttribArray);
+    opengl_get_function(glDisableVertexAttribArray);
+    opengl_get_function(glActiveTexture);
+    opengl_get_function(glUniform1i);
+    opengl_get_function(wglSwapIntervalEXT);
+}
+
+static void
 win32_init_opengl(HWND window) {
+    
+    open_gl = (opengl *) VirtualAlloc(0, sizeof(opengl), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
     
     HDC window_dc = GetDC(window);
     
@@ -183,6 +226,7 @@ win32_init_opengl(HWND window) {
         if (SetPixelFormat(window_dc, pixel_format_index, &suggested_pixel_format)) {
             HGLRC gl_rc = wglCreateContext(window_dc);
             if (wglMakeCurrent(window_dc, gl_rc)) {
+                open_gl->info = opengl_get_info();
                 win32_opengl_get_functions();
             } else {
                 invalid_code_path;
@@ -217,9 +261,8 @@ default_proc(HWND window,
             GetClientRect(window, &rect);
             int width = rect.right - rect.left;
             int height = rect.bottom - rect.top;
-            if (app_resize(&application, width, height)) {
-                resize_viewport(width, height);
-            }
+            application.width = width;
+            application.height = height;
         } break;
         default: {
             result = DefWindowProcA(window, message, wparam, lparam);
@@ -302,6 +345,11 @@ WinMain(HINSTANCE instance,
     int monitor_hz = 60;
     real32 target_seconds_per_frame = 1.f / monitor_hz;
     
+    real32 dt = target_seconds_per_frame;
+    
+    LONGLONG fps_to_draw = (LONGLONG) monitor_hz;
+    real32 ms_per_frame_to_draw = target_seconds_per_frame; 
+    
     if (RegisterClassA(&window_class)) {
         HWND window = CreateWindowExA(0,
                                       window_class.lpszClassName,
@@ -320,6 +368,7 @@ WinMain(HINSTANCE instance,
             
             win32_init_opengl(window);
             
+            
             font debug_font = my_stbtt_initfont("c:/windows/fonts/LiberationMono-Regular.ttf", 16.f);
             font label_font = my_stbtt_initfont("c:/windows/fonts/LiberationMono-Regular.ttf", 24.f);
             font value_font = my_stbtt_initfont("c:/windows/fonts/LiberationMono-Bold.ttf", 24.f);
@@ -332,15 +381,15 @@ WinMain(HINSTANCE instance,
             QueryPerformanceCounter(&last_counter);
             
             timer_interval *change_clear_color_interval = 0;
+            timer_interval frame_time_render_rate = init_interval(0.5f);
             
             switchable_color clear_color = create_switchable_color(make_color(0.f, 0.f, 0.f), make_color(0.5f, 0.7f, 0.5f));
             
             application.current_time = target_seconds_per_frame;
             
-            init_quad_objects();
-            resize_viewport(application.width, application.height);
-            
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            immediate_init();
+            init_shaders();
+            set_shader(global_shader);
             
             while (application.running) {
                 
@@ -356,16 +405,33 @@ WinMain(HINSTANCE instance,
                             bool was_down = ((message.lParam & (1 << 30)) != 0);
                             bool is_down = ((message.lParam & (1UL << 31)) == 0);
                             if (was_down != is_down) {
-                                if (vk_code == 'U' && !http_state.request) {
-                                    winhttp_async_get(page_url);
-                                }
-                                if (vk_code == 'I' && is_down) {
-                                    if (change_clear_color_interval) {
-                                        change_clear_color_interval = 0;
-                                    } else {
-                                        timer_interval r = init_interval(0.5f);
-                                        change_clear_color_interval = &r;
-                                    }
+                                
+                                switch (vk_code) {
+                                    case 'D': {
+                                        if (is_down) {
+                                            application.show_debug_info = !application.show_debug_info;
+                                        }
+                                    } break;
+                                    
+                                    case 'I': {
+                                        if (is_down) {
+                                            if (change_clear_color_interval) {
+                                                change_clear_color_interval = 0;
+                                            } else {
+                                                timer_interval r = init_interval(0.5f);
+                                                change_clear_color_interval = &r;
+                                            }
+                                        }
+                                    } break;
+                                    
+                                    case 'U': {
+                                        if (!http_state.request && is_down) {
+                                            winhttp_async_get(page_url);
+                                        }
+                                    } break;
+                                    
+                                    default:
+                                    break;
                                 }
                             }
                             
@@ -383,38 +449,54 @@ WinMain(HINSTANCE instance,
                     }
                 }
                 
-                // Defines clear color and clear
+                // 
+                // Update
+                // 
+                if (application.show_debug_info && timer_increment(&frame_time_render_rate, application.dt)) {
+                    fps_to_draw = application.fps;
+                    ms_per_frame_to_draw = application.dt;
+                }
+                
+                if (timer_increment(change_clear_color_interval, application.dt)) {
+                    switch_colors(&clear_color);
+                }
+                
+                //
+                // App draw
+                //
                 v4 my_color = clear_color.e[clear_color.current];
                 glClearColor(my_color.r,
                              my_color.g,
                              my_color.b,
                              my_color.a);
-                glClear(GL_COLOR_BUFFER_BIT);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                
+                glViewport(0, 0, application.width, application.height);
+                render_right_handed(application.width, application.height);
                 
                 real32 margin = application.width * 0.025f;
-                
                 int state = application.current_state;
                 switch (state) {
                     case State_Processed: {
-                        real32 ypos = margin;
-                        real32 card_height = (real32) (application.height - 2 * margin) / (real32) array_count(application.cards);
+                        real32 ypos = 0.f;
+                        real32 card_height = (real32) application.height / (real32) array_count(application.cards);
                         for (int i = 0; i < array_count(application.cards); i++) {
                             card *card = get_card(&application, i);
                             if (!card || card->kind == Card_None) {
                                 continue;
                             }
-                            draw_quad(margin, ypos, (real32) application.width - margin, ypos + card_height, card->background_color);
                             
-                            // @Incomplete reset shader so we can render our text for now.
-                            set_shader(0);
+                            immediate_begin();
+                            immediate_quad(0.f, ypos, (real32) application.width, ypos + card_height, card->background_color, 1.f);
+                            immediate_flush();
                             
                             real32 card_margin = card_height * 0.1f;
                             real32 card_center_y = card_height * 0.4f + 6.f;
-                            my_stbtt_print(&label_font, margin*2.f, ypos + card_center_y, card->label, make_color(1.f, 1.f, 1.f));
+                            draw_text(margin*2.f, ypos + card_center_y, card->label, &label_font, make_color(1.f, 1.f, 1.f), 1.f);
                             
                             char value[256];
                             wsprintf(value, "%d", card->value);
-                            my_stbtt_print(&value_font, margin*2.f, ypos + card_center_y + 24.f, (u8*) value, make_color(1.f, 1.f, 1.f));
+                            draw_text(margin*2.f, ypos + card_center_y + 24.f, (u8*) value, &value_font, make_color(1.f, 1.f, 1.f), 1.f);
                             
                             ypos += card_height;
                         }
@@ -423,11 +505,11 @@ WinMain(HINSTANCE instance,
                     default: {
                         if (state >= 0 && state < State_Count) {
                             char *desc = app_get_state_description(&application);
-                            my_stbtt_print(&value_font, margin, application.height / 2.0f, (u8*) desc, make_color(1.f, 1.f, 1.f));
+                            draw_text(margin, application.height / 2.0f, (u8*) desc, &value_font, make_color(1.f, 1.f, 1.f), 1.f);
                             
                             switch (state) {
                                 case State_NetworkError: {
-                                    my_stbtt_print(&label_font, margin, (application.height / 2.0f) + 24.f, (u8 *) page_url, make_color(1.f, 0.f, 0.f));
+                                    draw_text(margin, (application.height / 2.0f) + 24.f, (u8 *) page_url, &label_font, make_color(1.f, 0.f, 0.f), 1.f);
                                 } break;
                                 
                                 default: {
@@ -435,6 +517,13 @@ WinMain(HINSTANCE instance,
                             }
                         }
                     };
+                }
+                
+                //
+                // Debug draw
+                //
+                if (application.show_debug_info) {
+                    draw_debug(&application, &debug_font, ms_per_frame_to_draw, fps_to_draw);
                 }
                 
                 LARGE_INTEGER work_counter = win32_get_wallclock();
@@ -457,25 +546,17 @@ WinMain(HINSTANCE instance,
                 LARGE_INTEGER end_counter = win32_get_wallclock();
                 real32 seconds_elapsed = win32_get_seconds_elapsed(last_counter, end_counter);
                 real32 ms_per_frame = 1000.0f * seconds_elapsed;
-                LONGLONG fps = (LONGLONG) frequency_counter / (end_counter.QuadPart - last_counter.QuadPart);
+                int fps = (int) (frequency_counter / (end_counter.QuadPart - last_counter.QuadPart));
                 
-                if (timer_increment(change_clear_color_interval, ms_per_frame)) {
-                    switch_colors(&clear_color);
-                }
-                
-                application.current_time += ms_per_frame;
-                
-                last_counter = end_counter;
-                
-                char timing_buffer[256];
-                _snprintf_s(timing_buffer, sizeof(timing_buffer),
-                            "%.02f ms,  %lld fps", ms_per_frame, fps);
-                v4 debug_color = make_color(1.f, 1.0f, 0.f);
-                my_stbtt_print(&debug_font, margin,
-                               application.height * 0.05f,
-                               (u8*) timing_buffer, debug_color);
                 SwapBuffers(hdc);
+                
+                application.dt = ms_per_frame;
+                application.current_time += ms_per_frame;
+                application.fps = fps;
+                last_counter = end_counter;
             }
+            
+            immediate_free();
             
             ReleaseDC(window, hdc);
         }

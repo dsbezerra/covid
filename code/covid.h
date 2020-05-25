@@ -43,8 +43,14 @@ struct app {
     int width;
     int height;
     int current_state;
+    
     real32 current_time;
+    
+    int fps;
+    real32 dt;
+    
     bool running;
+    bool show_debug_info;
     card cards[4];
 };
 
