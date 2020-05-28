@@ -2,25 +2,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <windows.h>
 #include <winhttp.h>
 #include <gl/gl.h>
 
 #include "covid.cpp"
-#include "covid_opengl.cpp"
 
 #include "win32_covid.h"
 #include "common.cpp"
-#include "font.cpp"
 
-#include "shader.cpp"
-#include "draw.cpp" 
 
-app application = init_app();
+app *application;
 win32_http_state http_state = {0};
 
-char *page_url = "saude.montesclaros.mg.gov.br";
+u8 *page_url = (u8 *) "saude.montesclaros.mg.gov.br";
 
 // This should be enough to store our page.
 char global_body_buffer[2048 * 2048];
@@ -68,15 +63,15 @@ winhttp_status_callback(HINTERNET internet,
     
     switch (internet_status) {
         case WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE: {
-            if (request && WinHttpReceiveResponse(request, 0)) {
-            }
+            if (request && WinHttpReceiveResponse(request, 0)) {}
         } break;
         
         case WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE: {
-            app_set_state(&application, State_ReadingPage);
+            app_set_state(application, State_ReadingPage);
             
             DWORD size = *((DWORD *) status_information);
             if (size) {
+                // @Cleanup temporary allocation
                 LPSTR buffer = new char[size + 1];
                 ZeroMemory(buffer, size + 1);
                 
@@ -93,6 +88,7 @@ winhttp_status_callback(HINTERNET internet,
             }
             
             strcat(global_body_buffer, (char *) status_information);
+            
             delete status_information;
             
             DWORD size;
@@ -103,8 +99,8 @@ winhttp_status_callback(HINTERNET internet,
                 server_response *page = create_server_response(global_body_buffer, strlen(global_body_buffer));
                 ZeroMemory(global_body_buffer, strlen(global_body_buffer) + 1);
                 
-                app_set_state(&application, State_ParsingPage);
-                parse_page(&application, page);
+                app_set_state(application, State_ParsingPage);
+                app_parse_page(application, page, page_url);
                 delete page;
                 
                 winhttp_close();
@@ -113,21 +109,20 @@ winhttp_status_callback(HINTERNET internet,
         } break;
         
         case WINHTTP_CALLBACK_STATUS_RECEIVING_RESPONSE: {
-            app_set_state(&application, State_ReceivingResponse);
+            app_set_state(application, State_ReceivingResponse);
         } break;
         
         case WINHTTP_CALLBACK_STATUS_RESPONSE_RECEIVED: {
-            app_set_state(&application, State_ResponseReceived);
+            app_set_state(application, State_ResponseReceived);
         } break;
         
         case WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE: {
             DWORD size;
-            if (WinHttpQueryDataAvailable(request, &size)) {
-            }
+            if (WinHttpQueryDataAvailable(request, &size)) {}
         } break;
         
         case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR: {
-            app_set_state(&application, State_NetworkError);
+            app_set_state(application, State_NetworkError);
         } break;
         
         default: {
@@ -138,7 +133,7 @@ winhttp_status_callback(HINTERNET internet,
 
 static void
 winhttp_async_get(char *url) {
-    app_set_state(&application, State_OpeningConnection);
+    app_set_state(application, State_OpeningConnection);
     http_state.session = WinHttpOpen(L"Default", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, WINHTTP_FLAG_ASYNC);
     if (http_state.session) {
         WinHttpSetStatusCallback(http_state.session, winhttp_status_callback, WINHTTP_CALLBACK_FLAG_ALL_NOTIFICATIONS, 0);
@@ -158,7 +153,7 @@ winhttp_async_get(char *url) {
             }
         } else {
             // TODO(diego): Diagnostic
-            app_set_state(&application, State_NetworkError);
+            app_set_state(application, State_NetworkError);
             WinHttpCloseHandle(http_state.session);
         }
         
@@ -166,7 +161,7 @@ winhttp_async_get(char *url) {
         
     } else {
         // TODO(diego): Diagnostic
-        app_set_state(&application, State_NetworkError);
+        app_set_state(application, State_NetworkError);
     }
 }
 
@@ -251,79 +246,25 @@ default_proc(HWND window,
     LRESULT result = 0;
     switch (message) {
         case WM_DESTROY: {
-            application.running = false;
+            application->running = false;
         } break;
         case WM_CLOSE: {
-            application.running = false;
+            application->running = false;
         };
         case WM_SIZE: {
+            assert(application);
             RECT rect;
             GetClientRect(window, &rect);
             int width = rect.right - rect.left;
             int height = rect.bottom - rect.top;
-            application.width = width;
-            application.height = height;
+            application->width = width;
+            application->height = height;
         } break;
         default: {
             result = DefWindowProcA(window, message, wparam, lparam);
         } break;
     }
     return result;
-}
-
-struct timer_interval {
-    real32 current_ms;
-    real32 interval_ms;
-};
-
-struct switchable_color {
-    int current;
-    union {
-        struct {
-            v4 a;
-            v4 b;
-        };
-        v4 e[2];
-    };
-};
-
-static void
-switch_colors(switchable_color *sc) {
-    if (sc->current == 0) {
-        sc->current = 1;
-    } else {
-        sc->current = 0;
-    }
-}
-
-static switchable_color
-create_switchable_color(v4 a, v4 b) {
-    switchable_color result = {};
-    result.a = a;
-    result.b = b;
-    result.current = 0;
-    return result;
-}
-
-static timer_interval
-init_interval(real32 seconds) {
-    timer_interval result = {};
-    result.current_ms = 0.f;
-    result.interval_ms = seconds * 1000.0f;
-    return result;
-}
-
-static int
-timer_increment(timer_interval *interval, real32 dt) {
-    if (!interval) return 0;
-    
-    interval->current_ms += dt;
-    if (interval->current_ms >= interval->interval_ms) {
-        interval->current_ms = 0.f;
-        return 1;
-    }
-    
-    return 0;
 }
 
 int CALLBACK
@@ -342,23 +283,26 @@ WinMain(HINSTANCE instance,
     window_class.hInstance = instance;
     window_class.lpszClassName = "CovidWindowClass";
     
-    int monitor_hz = 60;
-    real32 target_seconds_per_frame = 1.f / monitor_hz;
-    
-    real32 dt = target_seconds_per_frame;
-    
-    LONGLONG fps_to_draw = (LONGLONG) monitor_hz;
-    real32 ms_per_frame_to_draw = target_seconds_per_frame; 
-    
     if (RegisterClassA(&window_class)) {
+        
+        int monitor_hz = 60;
+        real32 target_seconds_per_frame = 1.f / monitor_hz;
+        
+        application = app_init();
+        application->dt = target_seconds_per_frame;
+        application->ms_per_frame_to_draw = target_seconds_per_frame;
+        application->fps_to_draw = monitor_hz;
+        application->current_time = target_seconds_per_frame;
+        application->frame_time_render_rate = init_interval(0.5f);
+        
         HWND window = CreateWindowExA(0,
                                       window_class.lpszClassName,
                                       "COVID-19 - Montes Claros",
                                       WS_OVERLAPPEDWINDOW | WS_VISIBLE,
                                       CW_USEDEFAULT,
                                       CW_USEDEFAULT,
-                                      application.width,
-                                      application.height,
+                                      application->width,
+                                      application->height,
                                       0,
                                       0,
                                       instance,
@@ -367,11 +311,8 @@ WinMain(HINSTANCE instance,
             HDC hdc = GetDC(window);
             
             win32_init_opengl(window);
-            
-            
-            font debug_font = my_stbtt_initfont("c:/windows/fonts/LiberationMono-Regular.ttf", 16.f);
-            font label_font = my_stbtt_initfont("c:/windows/fonts/LiberationMono-Regular.ttf", 24.f);
-            font value_font = my_stbtt_initfont("c:/windows/fonts/LiberationMono-Bold.ttf", 24.f);
+            app_init_fonts(application);
+            app_set_clear_color(make_color(0x0));
             
             LARGE_INTEGER frequency_counter_large;
             QueryPerformanceFrequency(&frequency_counter_large);
@@ -380,18 +321,11 @@ WinMain(HINSTANCE instance,
             LARGE_INTEGER last_counter;
             QueryPerformanceCounter(&last_counter);
             
-            timer_interval *change_clear_color_interval = 0;
-            timer_interval frame_time_render_rate = init_interval(0.5f);
-            
-            switchable_color clear_color = create_switchable_color(make_color(0.f, 0.f, 0.f), make_color(0.5f, 0.7f, 0.5f));
-            
-            application.current_time = target_seconds_per_frame;
-            
             immediate_init();
             init_shaders();
             set_shader(global_shader);
             
-            while (application.running) {
+            while (application->running) {
                 
                 MSG message;
                 while (PeekMessage(&message, 0, 0, 0, PM_REMOVE)) {
@@ -405,39 +339,26 @@ WinMain(HINSTANCE instance,
                             bool was_down = ((message.lParam & (1 << 30)) != 0);
                             bool is_down = ((message.lParam & (1UL << 31)) == 0);
                             if (was_down != is_down) {
-                                
                                 switch (vk_code) {
                                     case 'D': {
                                         if (is_down) {
-                                            application.show_debug_info = !application.show_debug_info;
-                                        }
-                                    } break;
-                                    
-                                    case 'I': {
-                                        if (is_down) {
-                                            if (change_clear_color_interval) {
-                                                change_clear_color_interval = 0;
-                                            } else {
-                                                timer_interval r = init_interval(0.5f);
-                                                change_clear_color_interval = &r;
-                                            }
+                                            application->show_debug_info = !application->show_debug_info;
                                         }
                                     } break;
                                     
                                     case 'U': {
                                         if (!http_state.request && is_down) {
-                                            winhttp_async_get(page_url);
+                                            winhttp_async_get((char *) page_url);
                                         }
                                     } break;
                                     
-                                    default:
-                                    break;
+                                    default: break;
                                 }
                             }
                             
                             bool alt_key_was_down = (message.lParam & (1 << 29));
                             if ((vk_code == VK_F4) && alt_key_was_down) {
-                                application.running = false;
+                                application->running = false;
                             }
                             
                         } break;
@@ -452,80 +373,17 @@ WinMain(HINSTANCE instance,
                 // 
                 // Update
                 // 
-                if (application.show_debug_info && timer_increment(&frame_time_render_rate, application.dt)) {
-                    fps_to_draw = application.fps;
-                    ms_per_frame_to_draw = application.dt;
-                }
-                
-                if (timer_increment(change_clear_color_interval, application.dt)) {
-                    switch_colors(&clear_color);
-                }
+                app_update(application);
                 
                 //
                 // App draw
                 //
-                v4 my_color = clear_color.e[clear_color.current];
-                glClearColor(my_color.r,
-                             my_color.g,
-                             my_color.b,
-                             my_color.a);
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                app_draw(application);
                 
-                glViewport(0, 0, application.width, application.height);
-                render_right_handed(application.width, application.height);
                 
-                real32 margin = application.width * 0.025f;
-                int state = application.current_state;
-                switch (state) {
-                    case State_Processed: {
-                        real32 ypos = 0.f;
-                        real32 card_height = (real32) application.height / (real32) array_count(application.cards);
-                        for (int i = 0; i < array_count(application.cards); i++) {
-                            card *card = get_card(&application, i);
-                            if (!card || card->kind == Card_None) {
-                                continue;
-                            }
-                            
-                            immediate_begin();
-                            immediate_quad(0.f, ypos, (real32) application.width, ypos + card_height, card->background_color, 1.f);
-                            immediate_flush();
-                            
-                            real32 card_margin = card_height * 0.1f;
-                            real32 card_center_y = card_height * 0.4f + 6.f;
-                            draw_text(margin*2.f, ypos + card_center_y, card->label, &label_font, make_color(1.f, 1.f, 1.f), 1.f);
-                            
-                            char value[256];
-                            wsprintf(value, "%d", card->value);
-                            draw_text(margin*2.f, ypos + card_center_y + 24.f, (u8*) value, &value_font, make_color(1.f, 1.f, 1.f), 1.f);
-                            
-                            ypos += card_height;
-                        }
-                    } break;
-                    
-                    default: {
-                        if (state >= 0 && state < State_Count) {
-                            char *desc = app_get_state_description(&application);
-                            draw_text(margin, application.height / 2.0f, (u8*) desc, &value_font, make_color(1.f, 1.f, 1.f), 1.f);
-                            
-                            switch (state) {
-                                case State_NetworkError: {
-                                    draw_text(margin, (application.height / 2.0f) + 24.f, (u8 *) page_url, &label_font, make_color(1.f, 0.f, 0.f), 1.f);
-                                } break;
-                                
-                                default: {
-                                } break;
-                            }
-                        }
-                    };
-                }
-                
-                //
-                // Debug draw
-                //
-                if (application.show_debug_info) {
-                    draw_debug(&application, &debug_font, ms_per_frame_to_draw, fps_to_draw);
-                }
-                
+                // 
+                // Ensure a forced frame time
+                // 
                 LARGE_INTEGER work_counter = win32_get_wallclock();
                 real32 work_seconds_elapsed = win32_get_seconds_elapsed(last_counter, work_counter);
                 
@@ -542,7 +400,9 @@ WinMain(HINSTANCE instance,
                     }
                 }
                 
+                // 
                 // Get the frame time
+                //
                 LARGE_INTEGER end_counter = win32_get_wallclock();
                 real32 seconds_elapsed = win32_get_seconds_elapsed(last_counter, end_counter);
                 real32 ms_per_frame = 1000.0f * seconds_elapsed;
@@ -550,13 +410,14 @@ WinMain(HINSTANCE instance,
                 
                 SwapBuffers(hdc);
                 
-                application.dt = ms_per_frame;
-                application.current_time += ms_per_frame;
-                application.fps = fps;
+                application->dt = ms_per_frame;
+                application->current_time += ms_per_frame;
+                application->fps = fps;
                 last_counter = end_counter;
             }
             
             immediate_free();
+            app_free(application);
             
             ReleaseDC(window, hdc);
         }

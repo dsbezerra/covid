@@ -1,9 +1,4 @@
 #include "covid.h"
-#include "myhtml_utils.cpp"
-
-// ...
-card parse_card(myhtml_tree_node_t *node);
-void set_card(app *application, card new_card);
 
 static char *STATE_DESCRIPTIONS[] = {
     "Press U to get data",
@@ -18,31 +13,177 @@ static char *STATE_DESCRIPTIONS[] = {
 // 
 // App
 //
-app
-init_app() {
-    app result = {0};
-    result.width = APP_WIDTH;
-    result.height = APP_HEIGHT;
-    result.current_state = State_NoData;
-    result.running = true;
-    result.show_debug_info = true;
+app *
+app_init() {
+    app *result = (app *) malloc(sizeof(app));
+    result->width = APP_WIDTH;
+    result->height = APP_HEIGHT;
+    result->current_state = State_NoData;
+    result->running = true;
+    result->show_debug_info = true;
+    return result;
+}
+
+void
+app_init_fonts(app *result) {
+    assert(result);
+    result->font_debug = my_stbtt_initfont("c:/windows/fonts/Inconsolata-Regular.ttf", 16.f);
+    result->font_label = my_stbtt_initfont("c:/windows/fonts/Inconsolata-Regular.ttf", 28.f);
+    result->font_value = my_stbtt_initfont("c:/windows/fonts/Inconsolata-Bold.ttf", 24.f);
+}
+
+void
+app_free(app *application) {
+    if (application) return;
+    
+    // Free card label
+    for (int card_index = 0; 
+         card_index < array_count(application->cards); 
+         ++card_index) {
+        free(application->cards[card_index].label);
+    }
+    
+    
+    if (open_gl) {
+        VirtualFree(open_gl, 0, MEM_RELEASE);
+    }
+    
+    free(application);
+}
+
+void
+app_set_clear_color(v4 color) {
+    glClearColor(color.r, color.g, color.b, color.a);
+}
+
+void
+app_update(app *application) {
+    timer_interval *change_clear_color_interval = &application->change_clear_color_interval;
+    timer_interval *frame_time_render_rate = &application->frame_time_render_rate;
+    
+    if (application->show_debug_info && timer_increment(frame_time_render_rate, application->dt)) {
+        application->fps_to_draw = application->fps;
+        application->ms_per_frame_to_draw = application->dt;
+    }
+}
+
+void
+app_draw_processed(app *application) {
+    
+    real32 ypos = 0.f;
+    real32 card_height = (real32) application->height / (real32) array_count(application->cards);
+    
+    real32 margin = application->width * 0.05f;
+    
+    font label_font = application->font_label;
+    font value_font = application->font_value;
+    font debug_font = application->font_debug;
+    
+    for (int i = 0; i < array_count(application->cards); i++) {
+        card *card = get_card(application, i);
+        if (!card || card->kind == Card_None) {
+            continue;
+        }
+        
+        immediate_begin();
+        immediate_quad(0.f, ypos, (real32) application->width, ypos + card_height, card->background_color, 1.f);
+        immediate_flush();
+        
+        real32 card_margin = card_height * 0.1f;
+        real32 card_center_y = card_height * 0.4f + 6.f;
+        draw_text(margin*2.f, ypos + card_center_y, card->label, &label_font, make_color(1.f, 1.f, 1.f), 1.f);
+        
+        char value[256];
+        wsprintf(value, "%d", card->value);
+        draw_text(margin*2.f, ypos + card_center_y + 24.f, (u8*) value, &value_font, make_color(1.f, 1.f, 1.f), 1.f);
+        
+        ypos += card_height;
+    }
+}
+
+void
+app_draw(app *application) {
+    glClear(GL_COLOR_BUFFER_BIT);
+    glViewport(0, 0, application->width, application->height);
+    
+    render_right_handed(application->width, application->height);
+    
+    //
+    // Draw current app state
+    //
+    int state = application->current_state;
+    switch (state) {
+        case State_Processed: {
+            app_draw_processed(application);
+        } break;
+        
+        default: {
+            
+            if (state >= 0 && state < State_Count) {
+                real32 margin = application->width * 0.05f;
+                
+                font value_font = application->font_value;
+                font label_font = application->font_label;
+                
+                char *desc = app_get_state_description(application);
+                draw_text(margin, application->height / 2.0f, (u8*) desc, &value_font, make_color(1.f, 1.f, 1.f), 1.f);
+                
+                switch (state) {
+                    case State_NetworkError: {
+                        draw_text(margin, (application->height / 2.0f) + 24.f, application->loaded_page, &label_font, make_color(1.f, 0.f, 0.f), 1.f);
+                    } break;
+                    
+                    default: {
+                    } break;
+                }
+            }
+            
+        } break;
+    }
+    
+    //
+    // Debug draw
+    //
+    
+    if (application->show_debug_info) {
+        draw_debug(application, 
+                   &application->font_debug, 
+                   application->ms_per_frame_to_draw, 
+                   application->fps_to_draw);
+    }
+}
+
+dimension
+app_get_dimensions(app *application) {
+    dimension result = {};
+    
+    if (!application) {
+        result.width = APP_WIDTH;
+        result.height = APP_HEIGHT;
+    } else {
+        result.width = application->width;
+        result.height = application->height;
+    }
+    
     return result;
 }
 
 void
 app_set_state(app *application, int new_state) {
     assert(application);
+    
     application->current_state = new_state;
 }
 
 char *
 app_get_state_description(app *application) {
     assert(application);
+    
     return STATE_DESCRIPTIONS[application->current_state];
 }
 
 void
-parse_page(app *application, server_response *page) {
+app_parse_page(app *application, server_response *page, u8 *page_url) {
     assert(application);
     assert(page);
     
@@ -75,6 +216,7 @@ parse_page(app *application, server_response *page) {
     myhtml_destroy(myhtml);
     
     app_set_state(application, State_Processed);
+    application->loaded_page = page_url;
 }
 
 //
@@ -85,6 +227,7 @@ set_card(app *application, card new_card) {
     if (new_card.kind == Card_None) {
         return;
     }
+    
     assert(application);
     
     new_card.height = (real32) application->height / (real32) array_count(application->cards);
@@ -169,8 +312,8 @@ parse_card(myhtml_tree_node_t *node) {
 
 static server_response *
 create_server_response(char *body, int content_length) {
-    server_response *result = new server_response;
-    result->body = new char[content_length + 1];
+    server_response *result = (server_response *) malloc(sizeof(server_response));
+    result->body = (char *) malloc(content_length + 1);
     strcpy(result->body, body);
     result->content_length = content_length;
     return result;
@@ -178,7 +321,8 @@ create_server_response(char *body, int content_length) {
 
 static void
 destroy_server_response(server_response *response) {
-    if (response) {
-        delete response;
-    }
+    if (!response) return;
+    
+    free(response->body);
+    free(response);
 }

@@ -1,4 +1,4 @@
-#include "draw.h"
+#include "covid_draw.h"
 
 imm* immediate;
 mat4 view_matrix;
@@ -112,10 +112,10 @@ immediate_flush() {
     open_gl->glEnableVertexAttribArray(color_loc);
     
     open_gl->glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)(sizeof(v2) + sizeof(v4)));
-	open_gl->glEnableVertexAttribArray(uv_loc);
+    open_gl->glEnableVertexAttribArray(uv_loc);
     
     open_gl->glVertexAttribPointer(z_index_loc, 1, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)(sizeof(v2) + sizeof(v4) + sizeof(v2)));
-	open_gl->glEnableVertexAttribArray(z_index_loc);
+    open_gl->glEnableVertexAttribArray(z_index_loc);
     
     glDrawArrays(GL_TRIANGLES, 0, immediate->num_vertices);
     
@@ -125,7 +125,7 @@ immediate_flush() {
     open_gl->glDisableVertexAttribArray(z_index_loc);
     
     open_gl->glBindVertexArray(0);
-	open_gl->glBindBuffer(GL_ARRAY_BUFFER, 0);
+    open_gl->glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     immediate->num_vertices = 0;
 }
@@ -184,9 +184,6 @@ draw_text(real32 x, real32 y, u8 *text, font *font, v4 color, real32 z_index) {
             stbtt_aligned_quad q;
             stbtt_GetBakedQuad(font->cdata, BITMAP_SIZE, BITMAP_SIZE, *text - 32, &x, &y, &q, 1);
             
-            real32 w = q.x1 - q.x0;
-            real32 h = q.y1 - q.y0;
-            
             v2 bottom_right = make_v2(q.s1, q.t0);
             v2 bottom_left  = make_v2(q.s0, q.t0);
             v2 top_right    = make_v2(q.s1, q.t1);
@@ -211,15 +208,14 @@ draw_text(real32 x, real32 y, u8 *text, font *font, v4 color, real32 z_index) {
 }
 
 void
-draw_debug(app *application, font *debug_font, real32 ms_per_frame, LONGLONG fps) {
+draw_debug(app *application, font *debug_font, real32 ms_per_frame, int fps) {
     char debug_buffer[256];
     v4 debug_color = make_color(1.f, 1.0f, 0.f);
     v4 debug_back_color = make_color(4 / 255.f, 122 / 255.f, 200 / 255.f, .9f);
     
-    float debug_margin = application->height * 0.05f;
     opengl_info info = open_gl->info;
     _snprintf_s(debug_buffer, sizeof(debug_buffer),
-                "%s\n%s\n%s\n%.02f ms, %lld fps", info.vendor, info.renderer, info.version, ms_per_frame, fps);
+                "%s\n%s\n%s\n%.02f ms, %d fps", info.vendor, info.renderer, info.version, ms_per_frame, fps);
     
     float box_width = 0.f;
     int line_count = 0;
@@ -234,22 +230,20 @@ draw_debug(app *application, font *debug_font, real32 ms_per_frame, LONGLONG fps
             }
             line_width = 0.f;
         } else if (*at >= 32 && *at < 255) {
-            //int advance, lsb;
-            //stbtt_fontinfo finfo = debug_font->info;
-            //stbtt_GetCodepointHMetrics(&finfo, *at, &advance, &lsb);
-            //line_width += (advance * debug_font->scale);
-            line_width += 9.5f;
+            line_width += debug_font->cdata[*at].xadvance;
         }
         *at++;
     }
     line_count++;
     
     real32 box_height = line_count * debug_font->line_height;
-    real32 box_pad = box_height * 0.05f;
+    real32 box_pad = 6.f;
     
-    real32 box_x0 = debug_margin - box_pad;
-    real32 box_x1 = box_width + box_pad; 
-    real32 box_y0 = debug_margin - box_pad;
+    real32 margin = 12.f;
+    
+    real32 box_x0 = application->width - box_width - margin - box_pad;
+    real32 box_x1 = box_x0 + box_width + box_pad; 
+    real32 box_y0 = margin;
     real32 box_y1 = box_y0 + box_height + box_pad;
     
     real32 text_y = box_y0 + debug_font->line_height;
@@ -258,5 +252,5 @@ draw_debug(app *application, font *debug_font, real32 ms_per_frame, LONGLONG fps
     immediate_quad(box_x0, box_y0, box_x1, box_y1, debug_back_color, 1.f);
     immediate_flush();
     
-    draw_text(box_x0 + box_pad, text_y, (u8*) debug_buffer, debug_font, debug_color, 1.f);
+    draw_text(box_x0, text_y, (u8*) debug_buffer, debug_font, debug_color, 1.f);
 }

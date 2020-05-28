@@ -1,5 +1,8 @@
-#include "covid_types.h"
+#include "covid_types.h" 
 #include "covid_math.h"
+
+#include "font.cpp"
+#include "myhtml_utils.cpp"
 
 #define APP_WIDTH 500
 #define APP_HEIGHT 500
@@ -34,9 +37,25 @@ struct card {
     real32     center_y;
 };
 
+struct switchable_color {
+    int current;
+    union {
+        struct {
+            v4 a;
+            v4 b;
+        };
+        v4 e[2];
+    };
+};
+
 struct server_response {
     char *body;
     int content_length;
+};
+
+struct timer_interval {
+    real32 current_ms;
+    real32 interval_ms;
 };
 
 struct app {
@@ -49,9 +68,26 @@ struct app {
     int fps;
     real32 dt;
     
-    bool running;
+    int fps_to_draw;
+    real32 ms_per_frame_to_draw;
+    
+    font font_debug;
+    font font_label;
+    font font_value;
+    
+    timer_interval change_clear_color_interval;
+    timer_interval frame_time_render_rate;
+    
     bool show_debug_info;
+    
+    bool running;
     card cards[4];
+    u8 *loaded_page;
+};
+
+struct dimension {
+    int width;
+    int height;
 };
 
 inline v4
@@ -75,3 +111,39 @@ make_color(u32 color) {
     }
     return make_color(r, g, b, a);
 }
+
+static timer_interval
+init_interval(real32 seconds) {
+    timer_interval result = {};
+    result.current_ms = 0.f;
+    result.interval_ms = seconds * 1000.0f;
+    return result;
+}
+
+static int
+timer_increment(timer_interval *interval, real32 dt) {
+    if (!interval) return 0;
+    
+    interval->current_ms += dt;
+    if (interval->current_ms >= interval->interval_ms) {
+        interval->current_ms = 0.f;
+        return 1;
+    }
+    
+    return 0;
+}
+#include "covid_opengl.cpp"
+#include "covid_shader.cpp"
+#include "covid_draw.cpp"
+
+// 
+// App
+//
+char * app_get_state_description(app *);
+
+//
+// Cards
+//
+card * get_card(app *, int);
+card parse_card(myhtml_tree_node_t *node);
+void set_card(app *application, card new_card);

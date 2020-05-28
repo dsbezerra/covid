@@ -1,4 +1,4 @@
-#include "shader.h"
+#include "covid_shader.h"
 
 shader global_shader;
 shader text_shader = shader{0, 0, 1};
