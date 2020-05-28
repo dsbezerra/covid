@@ -148,7 +148,7 @@ void refresh_shader_transform() {
     }
     
     open_gl->glUniformMatrix4fv(immediate->current_shader.view_loc, 1, GL_FALSE, view_matrix.e);
-	open_gl->glUniformMatrix4fv(immediate->current_shader.projection_loc, 1, GL_FALSE, projection_matrix.e);
+    open_gl->glUniformMatrix4fv(immediate->current_shader.projection_loc, 1, GL_FALSE, projection_matrix.e);
 }
 
 void

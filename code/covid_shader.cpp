@@ -1,7 +1,7 @@
 #include "covid_shader.h"
 
 shader global_shader;
-shader text_shader = shader{0, 0, 1};
+
 static void
 check_compile_error(int shader) {
     int success;
@@ -121,7 +121,7 @@ init_shaders() {
     
     result.program = program;
     result.projection_loc = open_gl->glGetUniformLocation(program, "projection");
-	result.view_loc = open_gl->glGetUniformLocation(program, "view");
+    result.view_loc = open_gl->glGetUniformLocation(program, "view");
     result.texture_loc = open_gl->glGetUniformLocation(program, "ftex");
     result.position_loc = 0;
     result.color_loc    = 1;
