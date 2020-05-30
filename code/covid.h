@@ -21,35 +21,27 @@ enum state_type {
 
 enum card_kind {
     Card_None,
-    Card_Total,
-    Card_Investigation,
+    Card_Notifications,
+    Card_Negatives,
     Card_Confirmed,
-    Card_Discarded,
+    Card_Cured,
+    Card_Deaths,
+    Card_Count,
 };
 
 struct card {
     card_kind  kind;
     v4         background_color;
-    u8         *label;
+    u8         label[256];
+    u8         last_updated_at[256];
     u32        value;
     // Drawing properties
     real32     height;
     real32     center_y;
 };
 
-struct switchable_color {
-    int current;
-    union {
-        struct {
-            v4 a;
-            v4 b;
-        };
-        v4 e[2];
-    };
-};
-
 struct server_response {
-    char *body;
+    char body[2048 * 2048];
     int content_length;
 };
 
@@ -71,7 +63,7 @@ struct app {
     int fps_to_draw;
     real32 ms_per_frame_to_draw;
     
-    font font_debug;
+    font font_small;
     font font_label;
     font font_value;
     
@@ -81,7 +73,7 @@ struct app {
     bool show_debug_info;
     
     bool running;
-    card cards[4];
+    card cards[5];
     u8 *loaded_page;
 };
 
@@ -144,6 +136,6 @@ char * app_get_state_description(app *);
 //
 // Cards
 //
-card * get_card(app *, int);
-card parse_card(myhtml_tree_node_t *node);
-void set_card(app *application, card new_card);
+card * card_get(app *, int);
+card card_parse(myhtml_tree_node_t *node);
+void card_set(app *application, card new_card);

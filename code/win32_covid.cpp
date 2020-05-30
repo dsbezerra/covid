@@ -1,3 +1,4 @@
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,6 +6,8 @@
 #include <windows.h>
 #include <winhttp.h>
 #include <gl/gl.h>
+
+
 
 #include "covid.cpp"
 
@@ -40,6 +43,7 @@ win32_get_seconds_elapsed(LARGE_INTEGER start, LARGE_INTEGER end)
 
 static void
 winhttp_close() {
+    
     if (WinHttpCloseHandle(http_state.request)) {
         http_state.request = 0;
     }
@@ -101,8 +105,8 @@ winhttp_status_callback(HINTERNET internet,
                 
                 app_set_state(application, State_ParsingPage);
                 app_parse_page(application, page, page_url);
-                delete page;
                 
+                destroy_server_response(page);
                 winhttp_close();
             }
             
@@ -123,6 +127,10 @@ winhttp_status_callback(HINTERNET internet,
         
         case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR: {
             app_set_state(application, State_NetworkError);
+        } break;
+        
+        case WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING: {
+            WinHttpSetStatusCallback(http_state.request, 0, 0, 0);
         } break;
         
         default: {
@@ -272,6 +280,9 @@ WinMain(HINSTANCE instance,
         HINSTANCE prev_instance,
         LPSTR command_line,
         int show_code) {
+    
+    AllocConsole();
+    freopen("CONOUT$", "w+", stdout);
     
     LARGE_INTEGER perf_count_freq_res;
     QueryPerformanceFrequency(&perf_count_freq_res);

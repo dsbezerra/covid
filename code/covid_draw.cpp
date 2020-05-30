@@ -26,9 +26,7 @@ immediate_init() {
 
 static void
 immediate_free() {
-    if (immediate) {
-        free(immediate);
-    }
+    free(immediate);
 }
 
 static void
@@ -207,6 +205,46 @@ draw_text(real32 x, real32 y, u8 *text, font *font, v4 color, real32 z_index) {
     immediate_flush();
 }
 
+real32
+get_text_width(font *my_font, char *text, int *line_count) {
+    real32 result = 0.f;
+    real32 w = 0.f;
+    
+    if (line_count) {
+        *line_count = 0;
+    }
+    
+    char *at = text;
+    while (*at) {
+        if (*at == '\n' && line_count) {
+            if (w > result) {
+                result = w;
+            }
+            w = .0f;
+            (*line_count)++;
+        } else if (*at >= 32 && *at < 255) {
+            w += my_font->cdata[*at].xadvance;
+        }
+        *at++;
+    }
+    
+    if (w > result) {
+        result = w;
+    }
+    
+    if (line_count) {
+        (*line_count)++;
+    } 
+    
+    return result;
+}
+
+
+real32
+get_text_width(font *my_font, char *text) {
+    return get_text_width(my_font, text, 0);
+}
+
 void
 draw_debug(app *application, font *debug_font, real32 ms_per_frame, int fps) {
     char debug_buffer[256];
@@ -217,25 +255,8 @@ draw_debug(app *application, font *debug_font, real32 ms_per_frame, int fps) {
     _snprintf_s(debug_buffer, sizeof(debug_buffer),
                 "%s\n%s\n%s\n%.02f ms, %d fps", info.vendor, info.renderer, info.version, ms_per_frame, fps);
     
-    float box_width = 0.f;
-    int line_count = 0;
-    float line_width = 0.f;
-    
-    char *at = debug_buffer;
-    while (*at) {
-        if (*at == '\n') {
-            line_count++;
-            if (line_width > box_width) {
-                box_width = line_width;
-            }
-            line_width = 0.f;
-        } else if (*at >= 32 && *at < 255) {
-            line_width += debug_font->cdata[*at].xadvance;
-        }
-        *at++;
-    }
-    line_count++;
-    
+    int line_count;
+    real32 box_width = get_text_width(debug_font, debug_buffer, &line_count);
     real32 box_height = line_count * debug_font->line_height;
     real32 box_pad = 6.f;
     

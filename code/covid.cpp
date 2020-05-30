@@ -27,22 +27,14 @@ app_init() {
 void
 app_init_fonts(app *result) {
     assert(result);
-    result->font_debug = my_stbtt_initfont("c:/windows/fonts/Inconsolata-Regular.ttf", 16.f);
+    result->font_small = my_stbtt_initfont("c:/windows/fonts/Inconsolata-Regular.ttf", 16.f);
     result->font_label = my_stbtt_initfont("c:/windows/fonts/Inconsolata-Regular.ttf", 28.f);
     result->font_value = my_stbtt_initfont("c:/windows/fonts/Inconsolata-Bold.ttf", 24.f);
 }
 
 void
 app_free(app *application) {
-    if (application) return;
-    
-    // Free card label
-    for (int card_index = 0; 
-         card_index < array_count(application->cards); 
-         ++card_index) {
-        free(application->cards[card_index].label);
-    }
-    
+    if (!application) return;
     
     if (open_gl) {
         VirtualFree(open_gl, 0, MEM_RELEASE);
@@ -77,10 +69,10 @@ app_draw_processed(app *application) {
     
     font label_font = application->font_label;
     font value_font = application->font_value;
-    font debug_font = application->font_debug;
+    font small_font = application->font_small;
     
     for (int i = 0; i < array_count(application->cards); i++) {
-        card *card = get_card(application, i);
+        card *card = card_get(application, i);
         if (!card || card->kind == Card_None) {
             continue;
         }
@@ -97,6 +89,9 @@ app_draw_processed(app *application) {
         wsprintf(value, "%d", card->value);
         draw_text(margin*2.f, ypos + card_center_y + 24.f, (u8*) value, &value_font, make_color(1.f, 1.f, 1.f), 1.f);
         
+        real32 width = get_text_width(&small_font, (char *) card->last_updated_at);
+        real32 x = application->width - width - margin * .5f;
+        draw_text(x, ypos + card_height - 16.f, card->last_updated_at, &small_font, make_color(1.f, 1.f, 1.f, .6f), 1.f);
         ypos += card_height;
     }
 }
@@ -147,7 +142,7 @@ app_draw(app *application) {
     
     if (application->show_debug_info) {
         draw_debug(application, 
-                   &application->font_debug, 
+                   &application->font_small, 
                    application->ms_per_frame_to_draw, 
                    application->fps_to_draw);
     }
@@ -199,12 +194,12 @@ app_parse_page(app *application, server_response *page, u8 *page_url) {
     myhtml_parse(tree, MyENCODING_UTF_8, page->body, page->content_length);
     
     // parse html
-    char *target_clazz = "card";
-    myhtml_collection_t *collection = myhtml_get_nodes_by_attribute_value_whitespace_separated(tree, 0, 0, false, "class", strlen("class"), target_clazz, strlen(target_clazz), 0);
+    char *target_class = "card";
+    myhtml_collection_t *collection = myhtml_get_nodes_by_attribute_value_whitespace_separated(tree, 0, 0, false, "class", strlen("class"), target_class, strlen(target_class), 0);
     if (collection && collection->list && collection->length) {
         for(size_t i = 0; i < collection->length; i++) {
-            card new_card = parse_card(collection->list[i]);
-            set_card(application, new_card);
+            card new_card = card_parse(collection->list[i]);
+            card_set(application, new_card);
         }
     }
     
@@ -222,8 +217,9 @@ app_parse_page(app *application, server_response *page, u8 *page_url) {
 //
 // Cards
 //
+
 void
-set_card(app *application, card new_card) {
+card_set(app *application, card new_card) {
     if (new_card.kind == Card_None) {
         return;
     }
@@ -237,7 +233,7 @@ set_card(app *application, card new_card) {
 }
 
 card *
-get_card(app *application, int index) {
+card_get(app *application, int index) {
     assert(application);
     if (index >= 0 && index < array_count(application->cards)) {
         return &application->cards[index]; 
@@ -246,7 +242,7 @@ get_card(app *application, int index) {
 }
 
 card
-parse_card(myhtml_tree_node_t *node) {
+card_parse(myhtml_tree_node_t *node) {
     card result = card{0};
     
     myhtml_tree_attr_t *attr = get_attribute_by_key(node, "class");
@@ -258,19 +254,22 @@ parse_card(myhtml_tree_node_t *node) {
                 value[1] == 'g' &&
                 value[2] == '-') {
                 value += 3;
-                if (!strncmp(value, "info", strlen("info"))) {
-                    result.kind = Card_Total;
-                    result.background_color = make_color(0x17a2b8);
+                if (!strncmp(value, "secondary", strlen("secondary"))) {
+                    result.kind = Card_Notifications;
+                    result.background_color = make_color(0x6c757d);
+                } else if (!strncmp(value, "primary", strlen("primary"))) {
+                    result.kind = Card_Negatives;
+                    result.background_color = make_color(0x007bff);
                 } else if (!strncmp(value, "warning", strlen("warning"))) {
-                    result.kind = Card_Investigation;
-                    result.background_color = make_color(0xffc107);
-                } else if (!strncmp(value, "danger", strlen("danger"))) {
                     result.kind = Card_Confirmed;
-                    result.background_color = make_color(0xdc3545);
+                    result.background_color = make_color(0xffc107);
                 } else if (!strncmp(value, "success", strlen("success"))) {
-                    result.kind = Card_Discarded;
+                    result.kind = Card_Cured;
                     result.background_color = make_color(0x28a745);
-                }
+                } else if (!strncmp(value, "danger", strlen("danger"))) {
+                    result.kind = Card_Deaths;
+                    result.background_color = make_color(0xdc3545);
+                } 
             }
             ++value;
         }
@@ -286,19 +285,23 @@ parse_card(myhtml_tree_node_t *node) {
             }
             
             // Get text from p tag
-            myhtml_collection_t *p_list= myhtml_get_nodes_by_tag_id_in_scope(0, 0, node, MyHTML_TAG_P, 0);
+            myhtml_collection_t *p_list = myhtml_get_nodes_by_tag_id_in_scope(0, 0, node, MyHTML_TAG_P, 0);
             if (p_list && p_list->list && p_list->length == 1) {
                 myhtml_tree_node_t *text_node = myhtml_node_child(p_list->list[0]);
                 if (text_node) {
                     const char *text = myhtml_node_text(text_node, 0);
                     if (text) {
-                        result.label = html_utf8_text_to_extended_ascii((char *) text);
+                        char *label = (char *) html_utf8_text_to_extended_ascii((char *) text);
+                        strcpy((char *) result.label, label);
+                        free(label);
                     }
                 }
             }
             
-            myhtml_collection_destroy(h2_list);
-            myhtml_collection_destroy(p_list);
+            // Get last updated at
+            char *last_updated_at = get_text_from_tag_in_node(node, MyHTML_TAG_SPAN);
+            strcpy((char *) result.last_updated_at, last_updated_at);
+            free(last_updated_at);
         }
         
     }
@@ -313,7 +316,6 @@ parse_card(myhtml_tree_node_t *node) {
 static server_response *
 create_server_response(char *body, int content_length) {
     server_response *result = (server_response *) malloc(sizeof(server_response));
-    result->body = (char *) malloc(content_length + 1);
     strcpy(result->body, body);
     result->content_length = content_length;
     return result;
@@ -323,6 +325,5 @@ static void
 destroy_server_response(server_response *response) {
     if (!response) return;
     
-    free(response->body);
     free(response);
 }
