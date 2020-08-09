@@ -27,9 +27,9 @@ app_init() {
 void
 app_init_fonts(app *result) {
     assert(result);
-    result->font_small = my_stbtt_initfont("c:/windows/fonts/Inconsolata-Regular.ttf", 16.f);
-    result->font_label = my_stbtt_initfont("c:/windows/fonts/Inconsolata-Regular.ttf", 28.f);
-    result->font_value = my_stbtt_initfont("c:/windows/fonts/Inconsolata-Bold.ttf", 24.f);
+    result->font_small = my_stbtt_initfont("./data/fonts/Inconsolata-Regular.ttf", 16.f);
+    result->font_label = my_stbtt_initfont("./data/fonts/Inconsolata-Regular.ttf", 28.f);
+    result->font_value = my_stbtt_initfont("./data/fonts/Inconsolata-Bold.ttf", 24.f);
 }
 
 void
