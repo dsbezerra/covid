@@ -23,11 +23,6 @@ app_init() {
     result->height = APP_HEIGHT;
     result->current_state = State_NoData;
     result->running = true;
-    result->show_debug_info = true;
-    
-    // GUI
-    result->gui.show_demo_window = true;
-    
     return result;
 }
 
@@ -65,7 +60,8 @@ app_update(app *application) {
     timer_interval *change_clear_color_interval = &application->change_clear_color_interval;
     timer_interval *frame_time_render_rate = &application->frame_time_render_rate;
     
-    if (application->show_debug_info && timer_increment(frame_time_render_rate, application->dt)) {
+    gui_state gui = application->gui;
+    if (gui.show_debug_info && timer_increment(frame_time_render_rate, application->dt)) {
         application->fps_to_draw = application->fps;
         application->ms_per_frame_to_draw = application->dt;
     }
@@ -80,6 +76,7 @@ app_gui_tick(app *application) {
     if (state.show_demo_window)
         ImGui::ShowDemoWindow(&state.show_demo_window);
     gui_end_frame();
+    
 }
 
 void
@@ -163,7 +160,7 @@ app_draw(app *application) {
     // Debug draw
     //
     
-    if (application->show_debug_info) {
+    if (application->gui.show_debug_info) {
         draw_debug(application, 
                    &application->font_small, 
                    application->ms_per_frame_to_draw, 

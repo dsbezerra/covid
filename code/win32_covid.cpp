@@ -380,7 +380,7 @@ WinMain(HINSTANCE instance,
                                 switch (vk_code) {
                                     case 'D': {
                                         if (is_down) {
-                                            application->show_debug_info = !application->show_debug_info;
+                                            application->gui.show_debug_info = !application->gui.show_debug_info;
                                         }
                                     } break;
                                     

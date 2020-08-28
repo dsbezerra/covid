@@ -53,6 +53,7 @@ struct timer_interval {
 };
 
 struct gui_state {
+    bool show_debug_info;
     bool show_demo_window;
 };
 
@@ -75,8 +76,6 @@ struct app {
     
     timer_interval change_clear_color_interval;
     timer_interval frame_time_render_rate;
-    
-    bool show_debug_info;
     
     bool running;
     card cards[5];
