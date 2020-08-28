@@ -5,14 +5,18 @@
 #include <string.h>
 #include <windows.h>
 #include <winhttp.h>
-#include <gl/gl.h>
 
+#include <GL/gl3w.h>
+#include "wglext.h"
 
 
 #include "covid.cpp"
 
 #include "win32_covid.h"
 #include "common.cpp"
+
+#include "imgui/imgui_impl_win32.h"
+#include "imgui/imgui_impl_opengl3.h"
 
 
 app *application;
@@ -229,8 +233,10 @@ win32_init_opengl(HWND window) {
         if (SetPixelFormat(window_dc, pixel_format_index, &suggested_pixel_format)) {
             HGLRC gl_rc = wglCreateContext(window_dc);
             if (wglMakeCurrent(window_dc, gl_rc)) {
-                open_gl->info = opengl_get_info();
                 win32_opengl_get_functions();
+                open_gl->wglSwapIntervalEXT(1);
+                gl3wInit();
+                open_gl->info = opengl_get_info();
             } else {
                 invalid_code_path;
             }
@@ -245,12 +251,17 @@ win32_init_opengl(HWND window) {
     ReleaseDC(window, window_dc);
 }
 
+extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 static LRESULT CALLBACK
 default_proc(HWND window,
              UINT message,
              WPARAM wparam,
              LPARAM lparam) {
+    
+    if (ImGui_ImplWin32_WndProcHandler(window, message, wparam, lparam))
+        return true;
+    
     LRESULT result = 0;
     switch (message) {
         case WM_DESTROY: {
@@ -288,16 +299,21 @@ WinMain(HINSTANCE instance,
     QueryPerformanceFrequency(&perf_count_freq_res);
     global_perf_count_frequency = perf_count_freq_res.QuadPart;
     
+    
+    bool sleep_is_granular = timeBeginPeriod(1) == TIMERR_NOERROR; 
+    
     WNDCLASSA window_class = {};
     window_class.style = CS_HREDRAW|CS_VREDRAW;
     window_class.lpfnWndProc = default_proc;
     window_class.hInstance = instance;
     window_class.lpszClassName = "CovidWindowClass";
     
+    
     if (RegisterClassA(&window_class)) {
         
-        int monitor_hz = 60;
-        real32 target_seconds_per_frame = 1.f / monitor_hz;
+        int monitor_hz = 120;
+        int app_update_hz = monitor_hz;
+        real32 target_seconds_per_frame = 1.f / (real32) app_update_hz;
         
         application = app_init();
         application->dt = target_seconds_per_frame;
@@ -323,6 +339,16 @@ WinMain(HINSTANCE instance,
             
             win32_init_opengl(window);
             app_init_fonts(application);
+            
+            IMGUI_CHECKVERSION();
+            ImGui::CreateContext();
+            ImGuiIO& io = ImGui::GetIO(); (void)io;
+            //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+            ImGui_ImplWin32_Init(window);
+            ImGui_ImplOpenGL3_Init();
+            
+            app_init_gui(application);
+            
             app_set_clear_color(make_color(0x0));
             
             LARGE_INTEGER frequency_counter_large;
@@ -335,6 +361,7 @@ WinMain(HINSTANCE instance,
             immediate_init();
             init_shaders();
             set_shader(global_shader);
+            
             
             while (application->running) {
                 
@@ -391,6 +418,10 @@ WinMain(HINSTANCE instance,
                 //
                 app_draw(application);
                 
+                //
+                // GUI
+                // 
+                app_gui_tick(application);
                 
                 // 
                 // Ensure a forced frame time
@@ -400,26 +431,28 @@ WinMain(HINSTANCE instance,
                 
                 real32 seconds_elapsed_for_frame = work_seconds_elapsed;
                 if (seconds_elapsed_for_frame < target_seconds_per_frame) {
-                    DWORD sleep_ms = (DWORD)(1000.0f * (target_seconds_per_frame -
-                                                        seconds_elapsed_for_frame));
-                    if (sleep_ms > 0) {
-                        Sleep(sleep_ms);
+                    if (sleep_is_granular) {
+                        DWORD sleep_ms = (DWORD)(1000.0f * (target_seconds_per_frame -
+                                                            seconds_elapsed_for_frame));
+                        if (sleep_ms > 0) {
+                            Sleep(sleep_ms);
+                        }
                     }
+                    
                     while (seconds_elapsed_for_frame < target_seconds_per_frame) {
                         seconds_elapsed_for_frame= win32_get_seconds_elapsed(last_counter,
                                                                              win32_get_wallclock());
                     }
                 }
                 
+                SwapBuffers(hdc);
+                
                 // 
                 // Get the frame time
                 //
                 LARGE_INTEGER end_counter = win32_get_wallclock();
-                real32 seconds_elapsed = win32_get_seconds_elapsed(last_counter, end_counter);
-                real32 ms_per_frame = 1000.0f * seconds_elapsed;
-                int fps = (int) (frequency_counter / (end_counter.QuadPart - last_counter.QuadPart));
-                
-                SwapBuffers(hdc);
+                real32 ms_per_frame = 1000.0f * win32_get_seconds_elapsed(last_counter, end_counter);
+                int fps = (int) (global_perf_count_frequency / (end_counter.QuadPart - last_counter.QuadPart));
                 
                 application->dt = ms_per_frame;
                 application->current_time += ms_per_frame;

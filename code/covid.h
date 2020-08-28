@@ -1,3 +1,5 @@
+#pragma once
+
 #include "covid_types.h" 
 #include "covid_math.h"
 
@@ -50,6 +52,10 @@ struct timer_interval {
     real32 interval_ms;
 };
 
+struct gui_state {
+    bool show_demo_window;
+};
+
 struct app {
     int width;
     int height;
@@ -75,6 +81,8 @@ struct app {
     bool running;
     card cards[5];
     u8 *loaded_page;
+    
+    gui_state gui;
 };
 
 struct dimension {

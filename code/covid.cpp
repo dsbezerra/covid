@@ -1,4 +1,7 @@
 #include "covid.h"
+#include "covid_gui.cpp"
+
+#include "imgui/imgui.h"
 
 static char *STATE_DESCRIPTIONS[] = {
     "Press U to get data",
@@ -21,6 +24,10 @@ app_init() {
     result->current_state = State_NoData;
     result->running = true;
     result->show_debug_info = true;
+    
+    // GUI
+    result->gui.show_demo_window = true;
+    
     return result;
 }
 
@@ -30,6 +37,11 @@ app_init_fonts(app *result) {
     result->font_small = my_stbtt_initfont("./data/fonts/Inconsolata-Regular.ttf", 16.f);
     result->font_label = my_stbtt_initfont("./data/fonts/Inconsolata-Regular.ttf", 28.f);
     result->font_value = my_stbtt_initfont("./data/fonts/Inconsolata-Bold.ttf", 24.f);
+}
+
+void
+app_init_gui(app *result) {
+    gui_init(result);
 }
 
 void
@@ -57,6 +69,17 @@ app_update(app *application) {
         application->fps_to_draw = application->fps;
         application->ms_per_frame_to_draw = application->dt;
     }
+}
+
+void
+app_gui_tick(app *application) {
+    
+    gui_state state = application->gui;
+    
+    gui_begin_frame();
+    if (state.show_demo_window)
+        ImGui::ShowDemoWindow(&state.show_demo_window);
+    gui_end_frame();
 }
 
 void
