@@ -69,9 +69,7 @@ app_update(app *application) {
 
 void
 app_gui_tick(app *application) {
-    gui_begin_frame();
     gui_tick(application);
-    gui_end_frame();
 }
 
 void

@@ -20,9 +20,13 @@ static void
 gui_tick(app *application) {
     gui_state state = application->gui;
     
+    gui_begin_frame();
+    
     if (state.show_debug_info) {
         gui_show_debug_info(application);
     }
+    
+    gui_end_frame();
 }
 
 static void
