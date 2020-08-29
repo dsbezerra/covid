@@ -69,14 +69,9 @@ app_update(app *application) {
 
 void
 app_gui_tick(app *application) {
-    
-    gui_state state = application->gui;
-    
     gui_begin_frame();
-    if (state.show_demo_window)
-        ImGui::ShowDemoWindow(&state.show_demo_window);
+    gui_tick(application);
     gui_end_frame();
-    
 }
 
 void
@@ -154,17 +149,6 @@ app_draw(app *application) {
             }
             
         } break;
-    }
-    
-    //
-    // Debug draw
-    //
-    
-    if (application->gui.show_debug_info) {
-        draw_debug(application, 
-                   &application->font_small, 
-                   application->ms_per_frame_to_draw, 
-                   application->fps_to_draw);
     }
 }
 

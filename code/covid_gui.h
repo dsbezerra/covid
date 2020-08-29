@@ -5,7 +5,10 @@
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/imgui_impl_opengl3.h"
 
-void gui_init();
-void gui_begin_frame();
-void gui_end_frame();
-void gui_tick();
+static void gui_init();
+static void gui_begin_frame();
+static void gui_end_frame();
+static void gui_tick();
+
+// Widgets
+static void gui_show_debug_info(app *application);
