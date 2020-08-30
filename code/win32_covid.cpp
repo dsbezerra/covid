@@ -320,7 +320,7 @@ WinMain(HINSTANCE instance,
         application->ms_per_frame_to_draw = target_seconds_per_frame;
         application->fps_to_draw = monitor_hz;
         application->current_time = target_seconds_per_frame;
-        application->frame_time_render_rate = init_interval(0.5f);
+        application->frame_time_render_rate = init_interval(1.f / 1000.f);
         
         HWND window = CreateWindowExA(0,
                                       window_class.lpszClassName,
