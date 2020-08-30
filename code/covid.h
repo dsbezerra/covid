@@ -1,6 +1,7 @@
 #pragma once
 
 #include "covid_types.h" 
+#include "covid_shared.h"
 #include "covid_math.h"
 #include "covid_font.h"
 #include "covid_opengl.h"

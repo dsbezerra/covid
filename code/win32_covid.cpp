@@ -1,24 +1,16 @@
 
 #include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <windows.h>
 #include <winhttp.h>
-
 #include <GL/gl3w.h>
 #include "wglext.h"
 
-
 #include "covid.cpp"
 
-#include "common.cpp"
+#include "win32_covid.h"
 
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/imgui_impl_opengl3.h"
-
-
-#include "win32_covid.h"
 
 global_variable app *application;
 global_variable win32_http_state http_state = {0};
@@ -104,8 +96,9 @@ winhttp_status_callback(HINTERNET internet,
             }
             
             if (size == 0) {
-                server_response *page = create_server_response(global_body_buffer, strlen(global_body_buffer));
-                ZeroMemory(global_body_buffer, strlen(global_body_buffer) + 1);
+                int len = string_length(global_body_buffer);
+                server_response *page = create_server_response(global_body_buffer, len);
+                ZeroMemory(global_body_buffer, len  + 1);
                 
                 app_set_state(application, State_ParsingPage);
                 app_parse_page(application, page, page_url);
@@ -150,7 +143,7 @@ winhttp_async_get(char *url) {
     if (http_state.session) {
         WinHttpSetStatusCallback(http_state.session, winhttp_status_callback, WINHTTP_CALLBACK_FLAG_ALL_NOTIFICATIONS, 0);
         
-        int url_size = strlen(url) + 1;
+        int url_size = string_length(url) + 1;
         wchar_t *r = new wchar_t[url_size];
         mbstowcs(r, url, url_size);
         
