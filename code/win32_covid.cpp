@@ -12,24 +12,25 @@
 
 #include "covid.cpp"
 
-#include "win32_covid.h"
 #include "common.cpp"
 
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/imgui_impl_opengl3.h"
 
 
-app *application;
-win32_http_state http_state = {0};
+#include "win32_covid.h"
 
-u8 *page_url = (u8 *) "saude.montesclaros.mg.gov.br";
+global_variable app *application;
+global_variable win32_http_state http_state = {0};
+
+global_variable u8 *page_url = (u8 *) "saude.montesclaros.mg.gov.br";
 
 // This should be enough to store our page.
-char global_body_buffer[2048 * 2048];
+global_variable char global_body_buffer[2048 * 2048];
 
-LONGLONG global_perf_count_frequency;
+global_variable LONGLONG global_perf_count_frequency;
 
-inline LARGE_INTEGER
+internal inline LARGE_INTEGER
 win32_get_wallclock(void)
 {
     LARGE_INTEGER result;
@@ -37,7 +38,7 @@ win32_get_wallclock(void)
     return result;
 }
 
-inline real32
+internal inline real32
 win32_get_seconds_elapsed(LARGE_INTEGER start, LARGE_INTEGER end)
 {
     real32 result = ((real32) (end.QuadPart - start.QuadPart) /
@@ -45,9 +46,8 @@ win32_get_seconds_elapsed(LARGE_INTEGER start, LARGE_INTEGER end)
     return result;
 }
 
-static void
+internal void
 winhttp_close() {
-    
     if (WinHttpCloseHandle(http_state.request)) {
         http_state.request = 0;
     }
@@ -59,7 +59,7 @@ winhttp_close() {
     }
 }
 
-static void
+internal void
 winhttp_status_callback(HINTERNET internet,
                         DWORD_PTR context,
                         DWORD internet_status,
@@ -143,7 +143,7 @@ winhttp_status_callback(HINTERNET internet,
     }
 }
 
-static void
+internal void
 winhttp_async_get(char *url) {
     app_set_state(application, State_OpeningConnection);
     http_state.session = WinHttpOpen(L"Default", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, WINHTTP_FLAG_ASYNC);
@@ -177,41 +177,14 @@ winhttp_async_get(char *url) {
     }
 }
 
-static void
+internal void
 win32_opengl_get_functions() {
     assert(open_gl);
-    opengl_get_function(glGetShaderInfoLog);
-    opengl_get_function(glGetShaderiv);
-    opengl_get_function(glGetProgramiv);
-    opengl_get_function(glGetProgramInfoLog);
-    opengl_get_function(glShaderSource);
-    opengl_get_function(glCreateShader);
-    opengl_get_function(glCompileShader);
-    opengl_get_function(glDetachShader);
-    opengl_get_function(glDeleteShader);
-    opengl_get_function(glCreateProgram);
-    opengl_get_function(glAttachShader);
-    opengl_get_function(glLinkProgram);
-    opengl_get_function(glUseProgram);
-    opengl_get_function(glGenBuffers);
-    opengl_get_function(glBindVertexArray);
-    opengl_get_function(glBindBuffer);
-    opengl_get_function(glBufferData);
-    opengl_get_function(glBufferSubData);
-    opengl_get_function(glVertexAttribPointer);
-    opengl_get_function(glGenVertexArrays);
-    opengl_get_function(glDrawArrays);
-    opengl_get_function(glGetUniformLocation);
-    opengl_get_function(glUniform4f);
-    opengl_get_function(glUniformMatrix4fv);
-    opengl_get_function(glEnableVertexAttribArray);
-    opengl_get_function(glDisableVertexAttribArray);
-    opengl_get_function(glActiveTexture);
-    opengl_get_function(glUniform1i);
+    
     opengl_get_function(wglSwapIntervalEXT);
 }
 
-static void
+internal void
 win32_init_opengl(HWND window) {
     
     open_gl = (opengl *) VirtualAlloc(0, sizeof(opengl), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
@@ -253,7 +226,7 @@ win32_init_opengl(HWND window) {
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-static LRESULT CALLBACK
+internal LRESULT CALLBACK
 default_proc(HWND window,
              UINT message,
              WPARAM wparam,
@@ -408,24 +381,12 @@ WinMain(HINSTANCE instance,
                     }
                 }
                 
-                // 
-                // Update
-                // 
+                // Update 
                 app_update(application);
-                
-                //
-                // App draw
-                //
                 app_draw(application);
-                
-                //
-                // GUI
-                // 
                 app_gui_tick(application);
                 
-                // 
                 // Ensure a forced frame time
-                // 
                 LARGE_INTEGER work_counter = win32_get_wallclock();
                 real32 work_seconds_elapsed = win32_get_seconds_elapsed(last_counter, work_counter);
                 
@@ -447,9 +408,7 @@ WinMain(HINSTANCE instance,
                 
                 SwapBuffers(hdc);
                 
-                // 
                 // Get the frame time
-                //
                 LARGE_INTEGER end_counter = win32_get_wallclock();
                 real32 ms_per_frame = 1000.0f * win32_get_seconds_elapsed(last_counter, end_counter);
                 int fps = (int) (global_perf_count_frequency / (end_counter.QuadPart - last_counter.QuadPart));

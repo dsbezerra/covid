@@ -3,7 +3,6 @@
 static void
 gui_init(app *application) {
     application->gui.show_debug_info = true;
-    application->gui.show_demo_window = true;
     
     // Setup style
     ImGui::StyleColorsDark();

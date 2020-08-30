@@ -1,28 +1,26 @@
-#include "covid_shader.h"
+global_variable shader global_shader;
 
-shader global_shader;
-
-static void
+internal void
 check_compile_error(int shader) {
     int success;
     char log[512];
-    open_gl->glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (!success) {
-        open_gl->glGetShaderInfoLog(shader, 512, 0, log);
+        glGetShaderInfoLog(shader, 512, 0, log);
         OutputDebugString("ERROR::SHADER::VERTEX::COMPILATION_FAILED\n");
         OutputDebugString(log);
         OutputDebugString("\n");
     }
 }
 
-static void
+internal void
 check_linking_error(int program) {
     int success;
-    open_gl->glGetProgramiv(program, GL_LINK_STATUS, &success);
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success) {
         GLsizei ignored;
         char program_errors[4096];
-        open_gl->glGetProgramInfoLog(program, sizeof(program_errors), &ignored, program_errors);
+        glGetProgramInfoLog(program, sizeof(program_errors), &ignored, program_errors);
         
         OutputDebugString("ERROR::SHADER::PROGRAM::LINKING_FAILED\n");
         if (program_errors[0] != 0) {
@@ -33,45 +31,45 @@ check_linking_error(int program) {
     }
 }
 
-static int
+internal int
 compile_shader(int type, char *source) {
-    int shader = open_gl->glCreateShader(type);
-    open_gl->glShaderSource(shader, 1, &source, 0);
-    open_gl->glCompileShader(shader);
+    int shader = glCreateShader(type);
+    glShaderSource(shader, 1, &source, 0);
+    glCompileShader(shader);
     check_compile_error(shader);
     return shader;
 }
 
-static int
+internal int
 link_shaders(int n, ...) {
     va_list ap;
     va_start(ap, n);
-    int program = open_gl->glCreateProgram();
+    int program = glCreateProgram();
     int *shaders = new int[n];
     int *at = shaders;
     for (int i = 0; i < n; i++) {
         int shader = va_arg(ap, int);
         *at++ = shader;
-        open_gl->glAttachShader(program, shader);
+        glAttachShader(program, shader);
     }
     va_end(ap);
-    open_gl->glLinkProgram(program);
+    glLinkProgram(program);
     check_linking_error(program);
     
     while (*at) {
-        open_gl->glDetachShader(program, *at);
+        glDetachShader(program, *at);
         *at++;
     }
     
     return program;
 }
 
-static void
+internal void
 delete_shader(int shader) {
-    open_gl->glDeleteShader(shader);
+    glDeleteShader(shader);
 }
 
-static void
+internal void
 delete_shaders(int n, ...) {
     va_list ap;
     va_start(ap, n);
@@ -82,7 +80,7 @@ delete_shaders(int n, ...) {
     va_end(ap);
 }
 
-static void
+internal void
 init_shaders() {
     shader result = {};
     char *vertex = "#version 330 core\n#extension GL_ARB_separate_shader_objects: enable\n"
@@ -120,9 +118,9 @@ init_shaders() {
     delete_shaders(2, vertex_shader, fragment_shader);
     
     result.program = program;
-    result.projection_loc = open_gl->glGetUniformLocation(program, "projection");
-    result.view_loc = open_gl->glGetUniformLocation(program, "view");
-    result.texture_loc = open_gl->glGetUniformLocation(program, "ftex");
+    result.projection_loc = glGetUniformLocation(program, "projection");
+    result.view_loc = glGetUniformLocation(program, "view");
+    result.texture_loc = glGetUniformLocation(program, "ftex");
     result.position_loc = 0;
     result.color_loc    = 1;
     result.uv_loc       = 2;

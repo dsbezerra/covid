@@ -1,21 +1,8 @@
-#define STB_TRUETYPE_IMPLEMENTATION
-#include "stb_truetype.h"
-
-#define BITMAP_SIZE 512
-
-struct font {
-    GLuint texture;
-    stbtt_bakedchar cdata[224];
-    stbtt_fontinfo info;
-    real32 scale;
-    real32 line_height;
-};
-
-static font
-my_stbtt_initfont(char *fontpath, real32 size) {
-    font result = {};
+internal loaded_font
+load_font(char *fontpath, real32 size) {
+    loaded_font result = {};
     
-    int buffer_size = 1 << 20;
+    u32 buffer_size = 1 << 20;
     u8 *buffer = (u8 *) malloc(buffer_size);
     u8 *bitmap = (u8 *) malloc(BITMAP_SIZE * BITMAP_SIZE);
     

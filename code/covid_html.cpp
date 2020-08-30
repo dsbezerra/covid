@@ -1,4 +1,21 @@
-myhtml_tree_attr_t * 
+internal server_response *
+create_server_response(char *body, u32 content_length) {
+    server_response *result = (server_response *) malloc(sizeof(server_response));
+    
+    strcpy(result->body, body);
+    result->content_length = content_length;
+    
+    return result;
+}
+
+internal void
+destroy_server_response(server_response *response) {
+    assert(response);
+    
+    free(response);
+}
+
+internal myhtml_tree_attr_t * 
 get_attribute_by_key(myhtml_tree_node_t *node, char *key) {
     myhtml_tree_attr_t *attr = myhtml_node_attribute_first(node);
     while (attr) {
@@ -11,10 +28,9 @@ get_attribute_by_key(myhtml_tree_node_t *node, char *key) {
     return 0;
 }
 
-size_t
+internal size_t
 utf8_to_codepoint(u8 *data, size_t *codepoint) {
     size_t result = 0;
-    
     
     if(!(data[0] & 0x80)) {      // 0xxxxxxx
         *codepoint = data[0];
@@ -37,7 +53,7 @@ utf8_to_codepoint(u8 *data, size_t *codepoint) {
     return result;
 }
 
-u8 *
+internal u8 *
 html_utf8_text_to_extended_ascii(char *src) {
     size_t size = strlen(src);
     u8 *result = (u8 *) malloc(size + 1);
@@ -54,7 +70,7 @@ html_utf8_text_to_extended_ascii(char *src) {
     return result;
 }
 
-char*
+internal char*
 get_text_from_tag_in_node(myhtml_tree_node_t *node, int tag) {
     
     char *result = 0;

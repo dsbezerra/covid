@@ -1,9 +1,11 @@
 #include "covid.h"
+#include "covid_html.cpp"
 #include "covid_gui.cpp"
+#include "covid_font.cpp"
 
 #include "imgui/imgui.h"
 
-static char *STATE_DESCRIPTIONS[] = {
+global_variable char *STATE_DESCRIPTIONS[] = {
     "Press U to get data",
     "Connecting...",
     "Receiving response...",
@@ -16,7 +18,7 @@ static char *STATE_DESCRIPTIONS[] = {
 // 
 // App
 //
-app *
+internal app *
 app_init() {
     app *result = (app *) malloc(sizeof(app));
     result->width = APP_WIDTH;
@@ -26,22 +28,23 @@ app_init() {
     return result;
 }
 
-void
-app_init_fonts(app *result) {
-    assert(result);
-    result->font_small = my_stbtt_initfont("./data/fonts/Inconsolata-Regular.ttf", 16.f);
-    result->font_label = my_stbtt_initfont("./data/fonts/Inconsolata-Regular.ttf", 28.f);
-    result->font_value = my_stbtt_initfont("./data/fonts/Inconsolata-Bold.ttf", 24.f);
+internal void
+app_init_fonts(app *application) {
+    assert(application);
+    
+    application->font_small = load_font("./data/fonts/Inconsolata-Regular.ttf", 16.f);
+    application->font_label = load_font("./data/fonts/Inconsolata-Regular.ttf", 28.f);
+    application->font_value = load_font("./data/fonts/Inconsolata-Bold.ttf", 24.f);
 }
 
-void
-app_init_gui(app *result) {
-    gui_init(result);
+internal void
+app_init_gui(app *application) {
+    gui_init(application);
 }
 
-void
+internal void
 app_free(app *application) {
-    if (!application) return;
+    assert(application);
     
     if (open_gl) {
         VirtualFree(open_gl, 0, MEM_RELEASE);
@@ -50,12 +53,12 @@ app_free(app *application) {
     free(application);
 }
 
-void
+internal void
 app_set_clear_color(v4 color) {
     glClearColor(color.r, color.g, color.b, color.a);
 }
 
-void
+internal void
 app_update(app *application) {
     timer_interval *change_clear_color_interval = &application->change_clear_color_interval;
     timer_interval *frame_time_render_rate = &application->frame_time_render_rate;
@@ -67,12 +70,12 @@ app_update(app *application) {
     }
 }
 
-void
+internal void
 app_gui_tick(app *application) {
     gui_tick(application);
 }
 
-void
+internal void
 app_draw_processed(app *application) {
     
     real32 ypos = 0.f;
@@ -80,9 +83,9 @@ app_draw_processed(app *application) {
     
     real32 margin = application->width * 0.05f;
     
-    font label_font = application->font_label;
-    font value_font = application->font_value;
-    font small_font = application->font_small;
+    loaded_font label_font = application->font_label;
+    loaded_font value_font = application->font_value;
+    loaded_font small_font = application->font_small;
     
     for (int i = 0; i < array_count(application->cards); i++) {
         card *card = card_get(application, i);
@@ -109,7 +112,7 @@ app_draw_processed(app *application) {
     }
 }
 
-void
+internal void
 app_draw(app *application) {
     glClear(GL_COLOR_BUFFER_BIT);
     glViewport(0, 0, application->width, application->height);
@@ -130,8 +133,8 @@ app_draw(app *application) {
             if (state >= 0 && state < State_Count) {
                 real32 margin = application->width * 0.05f;
                 
-                font value_font = application->font_value;
-                font label_font = application->font_label;
+                loaded_font value_font = application->font_value;
+                loaded_font label_font = application->font_label;
                 
                 char *desc = app_get_state_description(application);
                 draw_text(margin, application->height / 2.0f, (u8*) desc, &value_font, make_color(1.f, 1.f, 1.f), 1.f);
@@ -150,7 +153,7 @@ app_draw(app *application) {
     }
 }
 
-dimension
+internal dimension
 app_get_dimensions(app *application) {
     dimension result = {};
     
@@ -165,21 +168,22 @@ app_get_dimensions(app *application) {
     return result;
 }
 
-void
-app_set_state(app *application, int new_state) {
+internal void
+app_set_state(app *application, u32 new_state) {
     assert(application);
+    assert(new_state < State_Count);
     
     application->current_state = new_state;
 }
 
-char *
+internal char *
 app_get_state_description(app *application) {
     assert(application);
     
     return STATE_DESCRIPTIONS[application->current_state];
 }
 
-void
+internal void
 app_parse_page(app *application, server_response *page, u8 *page_url) {
     assert(application);
     assert(page);
@@ -220,7 +224,7 @@ app_parse_page(app *application, server_response *page, u8 *page_url) {
 // Cards
 //
 
-void
+internal void
 card_set(app *application, card new_card) {
     if (new_card.kind == Card_None) {
         return;
@@ -234,16 +238,18 @@ card_set(app *application, card new_card) {
     application->cards[new_card.kind - 1] = new_card;
 }
 
-card *
-card_get(app *application, int index) {
+internal card *
+card_get(app *application, u32 card_index) {
     assert(application);
-    if (index >= 0 && index < array_count(application->cards)) {
-        return &application->cards[index]; 
+    assert(card_index < array_count(application->cards));
+    
+    if (card_index >= 0 &&  card_index < array_count(application->cards)) {
+        return &application->cards[card_index]; 
     }
     return 0;
 }
 
-card
+internal card
 card_parse(myhtml_tree_node_t *node) {
     card result = card{0};
     
@@ -309,23 +315,4 @@ card_parse(myhtml_tree_node_t *node) {
     }
     
     return result;
-}
-
-//
-// Server response
-//
-
-static server_response *
-create_server_response(char *body, int content_length) {
-    server_response *result = (server_response *) malloc(sizeof(server_response));
-    strcpy(result->body, body);
-    result->content_length = content_length;
-    return result;
-}
-
-static void
-destroy_server_response(server_response *response) {
-    if (!response) return;
-    
-    free(response);
 }

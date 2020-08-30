@@ -21,4 +21,5 @@ struct imm {
     int num_vertices;
 };
 
-static void immediate_flush();
+internal void immediate_flush();
+// TODO(diego): Add others
