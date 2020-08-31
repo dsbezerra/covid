@@ -83,7 +83,7 @@ delete_shaders(int n, ...) {
 internal void
 init_shaders() {
     shader result = {};
-    char *vertex = "#version 330 core\n#extension GL_ARB_separate_shader_objects: enable\n"
+    char *vertex = "#version 330 core\n"
         "layout (location = 0) in vec2 position;\n"
         "layout (location = 1) in vec4 color;\n"
         "layout (location = 2) in vec2 uv;\n"
@@ -98,7 +98,7 @@ init_shaders() {
         "   out_color = color;\n"
         "   out_uv = uv;\n"
         "}\n\0";
-    char *fragment = "#version 330 core\n#extension GL_ARB_separate_shader_objects: enable\n"
+    char *fragment = "#version 330 core\n"
         "#extension GL_ARB_separate_shader_objects: enable\n"
         "out vec4 frag_color;\n"
         "in vec4 out_color;\n"
