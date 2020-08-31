@@ -17,6 +17,9 @@ global_variable win32_http_state http_state = {0};
 
 global_variable u8 *page_url = (u8 *) "saude.montesclaros.mg.gov.br";
 
+global_variable WINDOWPLACEMENT global_window_position = {sizeof(global_window_position)};
+
+
 // This should be enough to store our page.
 global_variable char global_body_buffer[2048 * 2048];
 
@@ -217,6 +220,33 @@ win32_init_opengl(HWND window) {
     ReleaseDC(window, window_dc);
 }
 
+internal void
+win32_toggle_fullscreen(HWND window) {
+    // This follow Raymund Chen's "How do I switch a window between normal and fullscreen
+    // https://blogs.msdn.microsoft.com/oldnewthing/20100412-00/?p=14353/
+    DWORD style = GetWindowLong(window, GWL_STYLE);
+    if (style & WS_OVERLAPPEDWINDOW) {
+        MONITORINFO mi = { sizeof(mi) };
+        if (GetWindowPlacement(window, &global_window_position) &&
+            GetMonitorInfo(MonitorFromWindow(window,
+                                             MONITOR_DEFAULTTOPRIMARY), &mi)) {
+            SetWindowLong(window, GWL_STYLE,
+                          style & ~WS_OVERLAPPEDWINDOW);
+            SetWindowPos(window, HWND_TOP,
+                         mi.rcMonitor.left, mi.rcMonitor.top,
+                         mi.rcMonitor.right - mi.rcMonitor.left,
+                         mi.rcMonitor.bottom - mi.rcMonitor.top,
+                         SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+        }
+    } else {
+        SetWindowLong(window, GWL_STYLE, WS_VISIBLE|WS_OVERLAPPEDWINDOW);
+        SetWindowPlacement(window, &global_window_position);
+        SetWindowPos(window, NULL, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                     SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    }
+}
+
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 internal LRESULT CALLBACK
@@ -301,6 +331,7 @@ WinMain(HINSTANCE instance,
                                       instance,
                                       0);
         if (window) {
+            
             HDC hdc = GetDC(window);
             
             win32_init_opengl(window);
@@ -342,6 +373,7 @@ WinMain(HINSTANCE instance,
                             u32 vk_code = (u32) message.wParam;
                             bool was_down = ((message.lParam & (1 << 30)) != 0);
                             bool is_down = ((message.lParam & (1UL << 31)) == 0);
+                            bool alt_key_was_down = (message.lParam & (1 << 29));
                             if (was_down != is_down) {
                                 switch (vk_code) {
                                     case 'D': {
@@ -356,13 +388,20 @@ WinMain(HINSTANCE instance,
                                         }
                                     } break;
                                     
+                                    case VK_F4: {
+                                        if (alt_key_was_down && is_down) {
+                                            application->running = false;
+                                        }
+                                    } break;
+                                    
+                                    case VK_RETURN: {
+                                        if (alt_key_was_down && is_down) {
+                                            win32_toggle_fullscreen(window);
+                                        }
+                                    } break;
+                                    
                                     default: break;
                                 }
-                            }
-                            
-                            bool alt_key_was_down = (message.lParam & (1 << 29));
-                            if ((vk_code == VK_F4) && alt_key_was_down) {
-                                application->running = false;
                             }
                             
                         } break;
