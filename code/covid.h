@@ -9,8 +9,8 @@
 #include "covid_draw.h"
 #include "covid_html.h"
 
-#define APP_WIDTH 500
-#define APP_HEIGHT 500
+#define APP_WIDTH 960
+#define APP_HEIGHT 540
 
 enum state_type {
     State_NoData,
