@@ -2,6 +2,9 @@
 #include "covid_html.cpp"
 #include "covid_gui.cpp"
 #include "covid_font.cpp"
+#include "covid_opengl.cpp"
+#include "covid_shader.cpp"
+#include "covid_draw.cpp"
 
 #include "imgui/imgui.h"
 

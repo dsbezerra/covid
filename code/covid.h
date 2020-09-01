@@ -129,11 +129,6 @@ timer_increment(timer_interval *interval, real32 dt) {
     return 0;
 }
 
-#include "covid_opengl.cpp"
-#include "covid_shader.cpp"
-#include "covid_draw.cpp"
-
-
 internal app *app_init();
 internal void app_init_fonts(app *application);
 internal void app_init_gui(app *application);
