@@ -96,21 +96,20 @@ app_draw_processed(app *application) {
             continue;
         }
         
-        immediate_begin();
-        immediate_quad(0.f, ypos, (real32) application->width, ypos + card_height, card->background_color, 1.f);
-        immediate_flush();
+        draw_quad(0.f, ypos, (real32) application->width, ypos + card_height, card->background_color);
+        
         
         real32 card_margin = card_height * 0.1f;
         real32 card_center_y = card_height * 0.4f + 6.f;
-        draw_text(margin*2.f, ypos + card_center_y, card->label, &label_font, make_color(1.f, 1.f, 1.f), 1.f);
+        draw_text(margin*2.f, ypos + card_center_y, card->label, &label_font, make_color(1.f, 1.f, 1.f));
         
         char value[256];
         wsprintf(value, "%d", card->value);
-        draw_text(margin*2.f, ypos + card_center_y + 24.f, (u8*) value, &value_font, make_color(1.f, 1.f, 1.f), 1.f);
+        draw_text(margin*2.f, ypos + card_center_y + 24.f, (u8*) value, &value_font, make_color(1.f, 1.f, 1.f));
         
         real32 width = get_text_width(&small_font, (char *) card->last_updated_at);
         real32 x = application->width - width - margin * .5f;
-        draw_text(x, ypos + card_height - 16.f, card->last_updated_at, &small_font, make_color(1.f, 1.f, 1.f, .6f), 1.f);
+        draw_text(x, ypos + card_height - 16.f, card->last_updated_at, &small_font, make_color(1.f, 1.f, 1.f, .6f));
         ypos += card_height;
     }
 }
@@ -122,9 +121,7 @@ app_draw(app *application) {
     
     render_right_handed(application->width, application->height);
     
-    //
     // Draw current app state
-    //
     int state = application->current_state;
     switch (state) {
         case State_Processed: {
@@ -140,11 +137,11 @@ app_draw(app *application) {
                 loaded_font label_font = application->font_label;
                 
                 char *desc = app_get_state_description(application);
-                draw_text(margin, application->height / 2.0f, (u8*) desc, &value_font, make_color(1.f, 1.f, 1.f), 1.f);
+                draw_text(margin, application->height / 2.0f, (u8*) desc, &value_font, make_color(1.f, 1.f, 1.f));
                 
                 switch (state) {
                     case State_NetworkError: {
-                        draw_text(margin, (application->height / 2.0f) + 24.f, application->loaded_page, &label_font, make_color(1.f, 0.f, 0.f), 1.f);
+                        draw_text(margin, (application->height / 2.0f) + 24.f, application->loaded_page, &label_font, make_color(1.f, 0.f, 0.f));
                     } break;
                     
                     default: {
